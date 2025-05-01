@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace triliza.Models
 {
@@ -9,10 +10,12 @@ namespace triliza.Models
         public virtual ApplicationUser User { get; set; }
         [Required]
         public string UserId { get; set; }
+        [JsonIgnore]
         public virtual Session? Session { get; set; }
         public int SessionId { get; set; }
         public string? Shape { get; set; }
         public int Points { get; set; }
+        public bool HasWon { get; set; } = false;
 
     }
 }
