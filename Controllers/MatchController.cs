@@ -1,6 +1,7 @@
-﻿using System.Runtime.Intrinsics.X86;
+using System.Runtime.Intrinsics.X86;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using triliza.Data;
 using triliza.Models;
 
@@ -13,9 +14,9 @@ namespace triliza.Controllers
         private readonly ApplicationDbContext _context;
         private readonly SessionService _sese;
 
-        public MatchController(ApplicationDbContext context,SessionService sese)
+        public MatchController(ApplicationDbContext context, SessionService sese)
         {
-            
+
             this._context = context;
             this._sese = sese;
         }
@@ -36,13 +37,14 @@ namespace triliza.Controllers
                     ses.IsFull,
                     ses.DateOfGame,
                     ses.Score,
+                   
                     MatchingIds = ses.MatchIds.Select(a => new
                     {
                         a.Id,
                         a.UserId,
                         a.Shape,
-                        a.Points
-                       
+                        a.Points,
+                        
                     })
                 });
             }
@@ -60,18 +62,18 @@ namespace triliza.Controllers
         [HttpPost("find")]
         public async Task<IActionResult> FindOpps(string userId)
         {
-          var ses= _context.Sessions.Where(s => s.IsFull == false).ToList();
+            var ses = _context.Sessions.Where(s => s.IsFull == false).ToList();
             if (ses.Any())
             {
-              var ses3 =await _sese.CreateSession(userId);
-              var pre2=  new Match
+                var ses3 = await _sese.CreateSession(userId);
+                var pre2 = new Match
                 {
                     UserId = userId,
                     SessionId = ses3.Id,
-                    Shape="O",
-                    Points=0
+                    Shape = "O",
+                    Points = 0
                 };
-                
+
                 _context.PreSession.Add(pre2);
                 var latestSs = _context.Sessions.Where(s => s.Id == ses3.Id).FirstOrDefault();
                 if (latestSs != null)
@@ -81,15 +83,15 @@ namespace triliza.Controllers
                 await _context.SaveChangesAsync();
                 return Ok(new { ses3.Id });
             }
-            var ses2 = await _sese.CreateSession( userId);
+            var ses2 = await _sese.CreateSession(userId);
             var pre = new Match
             {
                 UserId = userId,
                 SessionId = ses2.Id,
                 Shape = "X",
-                Points =0
+                Points = 0
             };
-             
+
             _context.PreSession.Add(pre);
             var latestS = _context.Sessions.Where(s => s.Id == ses2.Id).FirstOrDefault();
             if (latestS != null)
@@ -97,8 +99,78 @@ namespace triliza.Controllers
                 latestS.MatchIds.Add(pre);
             }
             await _context.SaveChangesAsync();
-               
+
             return Ok(new { ses2.Id });
         }
+
+        [HttpPut("update/{sesId}")]
+        public async Task<IActionResult> UpdateExam(int sesId, [FromBody] SesUpdateDto sesUpdateDto)
+        {
+            if (sesUpdateDto == null)
+            {
+                return BadRequest("Invalid exam data.");
+            }
+            if (sesId <= 0) return BadRequest("Invalid sesId");
+
+            try
+            {
+                var ses = await _context.Sessions
+                    .Include(c => c.MatchIds)
+                    .FirstOrDefaultAsync(c => c.Id == sesId);
+
+                if (ses == null) return NotFound("Exam not found.");
+                
+                ses.Score = sesUpdateDto.Score;
+                ses.IsOver = true;
+                ses.MatchIds = sesUpdateDto.MatchIds.Select(q => new Match
+                {
+                    Id = q.Id,
+                    UserId = q.UserId,
+                    Points = q.Points,
+                    HasWon = q.Points == 4
+
+                }).ToList();
+
+                await _context.SaveChangesAsync();
+                return Ok(new SessionDto
+                {
+                    Id = ses.Id,
+                    Score = ses.Score,
+                    IsOver = ses.IsOver,
+                    MatchIds = ses.MatchIds.Select(m => new MatchDto
+                    {
+                        Id = m.Id,
+                        UserId = m.UserId,
+                        Points = m.Points,
+                        HasWon = m.Points==4
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating session: {ex.Message}");
+                return StatusCode(500, "Internal server error.");
+            }
+        }
+    }
+    public class MatchDto
+    {
+        public int Id { get; set; }
+        public string UserId { get; set; }
+        public int Points { get; set; }
+        public bool HasWon { get; set; }
+    }
+    public class SesUpdateDto
+    {
+        public string Score { get; set; }
+        public List<MatchDto> MatchIds { get; set; }
+
+    }
+    public class SessionDto
+    {
+        public int Id { get; set; }
+        public string Score { get; set; }
+        public List<MatchDto> MatchIds { get; set; }
+        public bool IsOver { get; set; }
     }
 }
