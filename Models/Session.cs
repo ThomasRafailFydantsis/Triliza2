@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace triliza.Models
 {
@@ -10,5 +10,6 @@ namespace triliza.Models
         public ICollection<Match>? MatchIds { get; set; }
         public DateTime DateOfGame { get; set; }
         public bool IsFull { get; set; }
+        public bool IsOver { get; set; }
     }
 }
